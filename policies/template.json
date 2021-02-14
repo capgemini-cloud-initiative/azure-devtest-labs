@@ -1,0 +1,127 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "name": {
+            "type": "string",
+            "defaultValue": "my-lab"
+        },
+        "regionId": {
+            "type": "string",
+            "defaultValue": "westeurope"
+        },
+        "identityType": {
+            "type": "string",
+            "defaultValue": "SystemAssigned"
+        },
+        "labIsolation": {
+            "type": "string",
+            "defaultValue": "Disabled"
+        },
+        "maxAllowedVmsPerUser": {
+            "type": "int",
+            "minValue": 0,
+            "defaultValue": 2, 
+            "metadata": {
+                "description": "The maximum number of VMs allowed per user."
+            }
+        },
+        "maxAllowedVmsPerLab": {
+            "type": "int",
+            "minValue": 0,
+            "metadata": {
+                "description": "The maximum number of VMs allowed per lab."
+            }
+        }
+    },
+    "resources": [
+        {
+            "apiVersion": "2018-10-15-preview",
+            "name": "[parameters('name')]",
+            "type": "Microsoft.DevTestLab/labs",
+            "location": "[parameters('regionId')]",
+            "tags": null,
+            "properties": {
+                "labStorageType": "Premium",
+                "isolateLabResources": "[parameters('labIsolation')]"
+            },
+            "identity": {
+                "type": "[parameters('identityType')]"
+            },
+            "resources": [
+                {
+                    "apiVersion": "2018-10-15-preview",
+                    "name": "LabVmsShutdown",
+                    "location": "[parameters('regionId')]",
+                    "type": "schedules",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.DevTestLab/labs', parameters('name'))]"
+                    ],
+                    "properties": {
+                        "status": "Enabled",
+                        "timeZoneId": "W. Europe Standard Time",
+                        "dailyRecurrence": {
+                            "time": "2200"
+                        },
+                        "taskType": "LabVmsShutdownTask",
+                        "notificationSettings": {
+                            "status": "Disabled",
+                            "timeInMinutes": 30
+                        }
+                    }
+                },
+                {
+                    "apiVersion": "2018-10-15-preview",
+                    "name": "[concat('Dtl', parameters('name'))]",
+                    "type": "virtualNetworks",
+                    "location": "[parameters('regionId')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.DevTestLab/labs', parameters('name'))]"
+                    ]
+                },
+                {
+                    "apiVersion": "2018-10-15-preview",
+                    "name": "Public Environment Repo",
+                    "type": "artifactSources",
+                    "location": "[parameters('regionId')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.DevTestLab/labs', parameters('name'))]"
+                    ],
+                    "properties": {
+                        "status": "Enabled"
+                    }
+                },
+                {
+                    "apiVersion": "2018-10-15-preview",
+                    "name": "default/MaxVmsAllowedPerUser",
+                    "type": "policySets/policies",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.DevTestLab/labs', parameters('name'))]"
+                    ],
+                    "properties": {
+                        "description": "",
+                        "factName": "UserOwnedLabVmCount",
+                        "threshold": "[string(parameters('maxAllowedVmsPerUser'))]",
+                        "evaluatorType": "MaxValuePolicy",
+                        "status": "enabled"
+                    }
+                },
+                {
+                    "apiVersion": "2018-10-15-preview",
+                    "name": "default/MaxVmsAllowedPerLab",
+                    "type": "policySets/policies",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.DevTestLab/labs', parameters('name'))]"
+                    ],
+                    "properties": {
+                        "description": "",
+                        "factName": "LabVmCount",
+                        "threshold": "[string(parameters('maxAllowedVmsPerLab'))]",
+                        "evaluatorType": "MaxValuePolicy",
+                        "status": "enabled"
+                    }
+                }
+            ]
+        }
+    ]
+}
